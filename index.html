@@ -1,0 +1,169 @@
+===================================================
+;;;   Sistema experto para el diagnóstico la Diabetes Mellitus Tipo 2
+;;;
+;;;     para ejecutar primero "load", luego "reset" y "run".
+;;;======================================================
+
+;;****************
+;;* Funciones *
+;;****************
+
+(deffunction ask-question (?question $?allowed-values)
+   (printout t ?question)
+   (bind ?answer (read))
+   (if (lexemep ?answer) 
+       then (bind ?answer (lowcase ?answer)))
+   (while (not (member ?answer ?allowed-values)) do
+      (printout t ?question)
+      (bind ?answer (read))
+      (if (lexemep ?answer) 
+          then (bind ?answer (lowcase ?answer))))
+   ?answer)
+
+(deffunction si-or-no-p (?question)
+   (bind ?response (ask-question ?question si no s n))
+   (if (or (eq ?response si) (eq ?response si))
+       then TRUE 
+       else FALSE))
+
+;;;**********************
+;;;* Reglas generales Estado Salud *
+;;;**********************
+
+(defrule normal-salud-estadoHTA-conclusions ""
+   (declare (salience 10))
+   (working-state salud normal)
+   =>
+   (assert (No tiene la presión elevada))
+   (assert (No tiene riesgo de HTA)))
+
+   
+(defrule cuidado2-salud-estadoHTA-conclusions ""
+   (declare (salience 10))
+   (working-state salud cuidado2)
+   =>
+   (assert (Su presión arterial esta elevada y puede ser riesgoso para su salud, debe consultar a su médico))
+   (assert (Si su presión esta sobre PAS: 180 mmHg PAD: 110 mmHg debe dirigirse a un centro asistencial)))
+
+
+(defrule cuidado-salud-estadoDM-conclusions ""
+   (declare (salience 10))
+   (working-state salud dm)
+   =>
+   (assert (Tiene menos 2 Factores de Riesgo para la DMT2))
+   (assert (Sus exámenes de GAA/ITG están normales))
+   (assert (No tiene riesgo de DMT2)))
+
+
+(defrule unsatisfactory-salud-state-conclusions ""
+   (declare (salience 10))
+   (Cuide-su-estado salud)
+   =>
+   (assert (Tiene varios factores de riesgo para la DMT2))
+   (assert (Si sus exámenes de GAA es sobre 126 mg/dL y/o ITG sobre 200 mg/dL debe dirigirse a un centro asistencial))
+   (assert (usted padece DMT2, debe consultar a su médico para tratamiento)))
+
+;;;***************
+;;;* Regla Inicial *
+;;;***************
+(defrule determine-HTA-estado ""
+    (not (working-state salud ?))
+   =>
+   (if (si-or-no-p "Para un diagnóstico exacto indique si su presión arterial esta en estos valores o sobre ellos, PAS: 120-139 mmHg
+PAD: 80 -89 mmHg (si/no)? ") 
+       then 
+       (if (si-or-no-p "Indique si su presión arterial esta sobre estos valores, PAS: 140-179 mmHg PAD: 90 -109 mmHg (si/no)? ")
+        then (assert (working-state salud cuidado2))
+		(assert (factor-riesgo dm))
+           else (assert (working-state salud normal))
+		(assert (factor-riesgo dm)))
+	      else
+ 		(assert (Su presión Arterial es Normal))
+		(assert (factor-riesgo dm)))) 
+
+;;;***************
+;;;* Reglas Factores de Riesgo *
+;;;***************
+
+(defrule determine-FRHF-estado ""
+   (factor-riesgo dm)
+
+   =>
+   (if (si-or-no-p "Tiene usted Historial Familiar directa con Diabetes Mellitus (si/no)? ")
+       then
+       (assert (La historial familiar es un factor de riesgo importante para la DMT2))       
+	else
+       (assert (No tiene Antecedentes de DMT2 en su familia))))
+
+
+(defrule determine-FRobesidad-estado ""
+  (factor-riesgo dm)
+  
+   =>
+   (if (si-or-no-p "Obesidad Central: Hombres > 90cm, Mujeres > 85cm (si/no)? ") 
+       then 
+       (if (si-or-no-p "alto IMC > 30 (si/no)? ")
+        then (assert (Usted tiene 2 factores de riesgo asociados a la obesidad. La obesidad es uno de los factores de riesgo principales para la DMT2))
+           else (assert (Tiene problemas con la obesidad central debe ser tratada ya que es factor de la DMT2)))
+	      else
+ 		(assert (No tiene Factores de obesidad))))
+
+
+(defrule determine-FRsedentario-estado ""
+  (factor-riesgo dm)
+   =>
+   (if (si-or-no-p "Se considera una persona sedentaria (No realiza ejercicio) (si/no)? ")
+       then
+       (assert (El sedentarismo es un factor de riesgo importante para la DMT2))       
+	else
+       (assert (No es sedentario)))) 
+
+
+(defrule determine-FRlipidos-estado ""
+	(factor-riesgo dm)
+   =>
+   (if (si-or-no-p "Trigliceridos elevados > 150 mg/dL (si/no)? ") 
+       then 
+       (if (si-or-no-p "Tiene el Colesterol HDL bajo: Hombres < 34,8 Mujeres < 38.67 mg/dL (si/no)? ")
+        then (assert (Cuide-su-estado de salud))
+           else (assert (Tiene los Triglicéridos Elevados debe consultar a su médico para tratamiento)))
+       else 
+       (assert (Sus niveles de Triglicéridos están bajos))))
+
+
+;;***************
+;;;* Reglas Factores clínicos *
+;;;***************
+
+(defrule determine-DMT2-estado ""
+    (factor-riesgo dm)
+   =>
+   (if (si-or-no-p "Para un diagnóstico exacto indique si sus valores de GAA e ITG están dentro de estos valores o sobre ellos, GAA: 110-125 mg/dL y/o ITG=  140-199 mg/dL (si/no)? ") 
+       then 
+       (if (si-or-no-p "Indique si sus valores de GAA/ITG están en estos rangos: GAA => 126 mg/dL y/o ITG => 200 mg/dL
+ (si/no)? ")
+        then (assert  (Cuide-su-estado salud))
+           else (assert  (Cuide-su-estado salud)))
+	      else
+ 		(assert (working-state salud dm))))
+
+
+;;;****************************
+;;;* STARTUP  RULES *
+;;;****************************
+
+(defrule system-banner2 ""
+  (declare (salience 11))
+  =>
+  (printout t crlf crlf)
+  (printout t " Sistema Experto para el diagnostico de la Diabetes Mellitus Tipo 2")
+  (printout t crlf crlf))
+
+(defrule print-repair ""
+  (declare (salience 10))
+  (repair ?item)
+  =>
+  (printout t crlf crlf)
+  (printout t "Visite a su Médico:")
+  (printout t crlf crlf)
+  (format t " %s%n%n%n" ?item))
